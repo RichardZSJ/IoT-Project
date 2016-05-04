@@ -6,12 +6,13 @@ import DoorSensor
 import AppCommunicate
 import CityWeather
 import Temperature
+import S3Upload
 
 def is_people_in_room():
 	return (roomSensorThread.get_room_sensor_result() or doorSensorThread.get_door_sensor_result())
 
 # Main thread
-def main():
+def mainThread():
 	try:
 		while 1:
 			print "People in room:", is_people_in_room()
@@ -29,16 +30,19 @@ if __name__ == '__main__':
 	doorSensorThread = DoorSensor.DoorSensorThread("DoorSensorThread")
 	appThread = AppCommunicate.AppCommuniacteServerThread("AppCommunicateThread")
 	tempThread = Temperature.TemperatureThread("TemperatureThread")
+	s3Thread = S3Upload.S3Uploader("S3Thread")
 
 	roomSensorThread.daemon = True
 	doorSensorThread.daemon = True
 	appThread.daemon = True
 	tempThread.daemon = True
+	s3Thread.daemon = True
 
 	roomSensorThread.start()
 	doorSensorThread.start()
 	appThread.start()
 	tempThread.start()
+	s3Thread.start()
 
-	main()
+	mainThread()
 	
