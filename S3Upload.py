@@ -21,7 +21,8 @@ class S3Uploader(threading.Thread):
 
 	def __init__(self, trainingData, threadName):
 		# Get s3 resource , function for this is in utils/aws
-		self.S3 = aws.getResource('s3','us-west-1')
+		threading.Thread.__init__(self)
+		self.S3 = aws.getResource('s3','us-east-1')
 		self.trainingData = trainingData
 		self.threadName = threadName
 		#self.S3_BUCKET_NAME = 'iotmon4mtadata'
@@ -30,7 +31,7 @@ class S3Uploader(threading.Thread):
 		print "Starting thread:", self.threadName + "..."
 		while True:
 			self.uploadData()
-			time.sleep(INTERVAL)
+			time.sleep(self.INTERVAL)
 
 	def uploadData(self):
 
@@ -113,5 +114,8 @@ if __name__ == "__main__":
 	s3Thread = S3Uploader(FILENAME, "S3Thread")
 	s3Thread.deamon = True
 	s3Thread.start()
-	while True:
-		pass
+	try:
+		while True:
+			time.sleep(10000)
+	except KeyboardInterrupt:
+		exit

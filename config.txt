@@ -1,0 +1,3 @@
+248966301247
+us-east-1:27f54100-4353-4631-8c51-30910147b122
+arn:aws:iam::248966301247:role/Cognito_EdisonAppUnauth_Role
