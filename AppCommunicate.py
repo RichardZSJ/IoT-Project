@@ -2,13 +2,8 @@ import socket
 import threading
 import csv
 import time
-
-HOST = '209.2.212.58'		# Server host
-PORT = 8888					# Server port
-BACKLOG = 10
-SIZE = 1024					# message size
-
-cols = ['TimeStamp', 'AdjustTempTo', 'CurrentRoomTemp', 'CurrentRoomHumidity', 'CurrentOutdoorTemp', 'CurrentOutdoorHumidity']
+import datetime
+import os
 
 class AppCommuniacteServerThread(threading.Thread):
 	
@@ -18,7 +13,13 @@ class AppCommuniacteServerThread(threading.Thread):
 		self.mode = None
 		self.setTemp = None
 		self.currentTemp = None
-
+		self.fileName = 'userCommand.csv'
+		self.HOST = '209.2.212.58'		# Server host
+		self.PORT = 8888					# Server port
+		self.BACKLOG = 10
+		self.SIZE = 1024					# message size
+		self.cols_user_command = ['TimeStamp', 'Mode', 'AdjustTempTo', 'ScheduleTime']
+		self.cols_schedule = ['ScheduleTime', 'AdjustTempTo']
 
 	def run(self):
 		print "Starting thread:", self.threadName + "..."
@@ -26,16 +27,16 @@ class AppCommuniacteServerThread(threading.Thread):
 		print 'Socket Created'
 
 		try:
-			s.bind((HOST,PORT))
-			s.listen(BACKLOG)
+			s.bind((self.HOST, self.PORT))
+			s.listen(self.BACKLOG)
 		except:
-			print "Fail to bind host and port, exiting"
+			print "Fail to bind host and port, change host address"
 			exit()
 
 		while 1:
 			client, address = s.accept()
 			
-			data = client.recv(SIZE)
+			data = client.recv(self.SIZE)
 			if data:
 				# When receving message
 				# Retrive data, log data to file, execute command.
@@ -46,39 +47,34 @@ class AppCommuniacteServerThread(threading.Thread):
 						# Manual mode
 						self.setTemp = int(data[1:3])
 						print "Execution: set temperature to", self.setTemp
-
-						with open('userCommand.csv', 'wb') as csvfile:
-							writer = csv.DictWriter(csvfile, fieldnames = cols)
-							writer.writerow({''})
-
+						commandDict = {'TimeStamp': int(time.time()), 'Mode': 'Manual', 'AdjustTempTo': self.setTemp}
 						with open(fileName, 'a') as csvfile:
-							writer = csv.DictWriter(csvfile, fieldnames = cols)
-							writer.writerow(self.tempDict)
+							writer = csv.DictWriter(csvfile, fieldnames = cols_user_command, lineterminator='\n')
+							writer.writerow(commandDict)
+						print "Logged user command to " + self.fileName
 
 					elif data[0] == 'S':
 						# Schedule task
-						if data[1] == 'A':
-							# Absolute temperature adjustment
-							# Data format: "MA26"
-							self.setTemp = int(data[2:4])
-							print "Set temperature to", self.setTemp
-						elif data[1] == 'R':
-							# Relative temperature adjustment
-							if data[2] == 'U':
-								# Temperature up
-								self.setTemp += 1
-								print "Set temperature to", self.setTemp
-							elif data[2] == 'D':
-								# Temperature down
-								self.setTemp -= 1
-								print "Set temperature to", self.setTemp
+						self.setTemp = int(data[1:3])
+						unixScheduleTime = int(data[3:])
+						datetimeTaskTime = datetime.datetime.fromtimestamp(unixScheduleTime).strftime('%Y-%m-%d %H:%M:%S')
+						print "Schedule Task @ " + str(datetimeTaskTime) + ", set temperature to", self.setTemp
+						commandDict = {'Mode': 'Schedule', 'setTemp': self.setTemp, 'Time': unixTaskTime}
+
+						with open(fileName, 'a') as csvfile:
+							writer = csv.DictWriter(csvfile, fieldnames=cols, lineterminator='\n')
+							writer.writerow(commandDict)
+						print "Logged user command to " + self.fileName
+						reader = csv.reader(open(self.fileName))
+						sortedSchedule = sorted(reader, key=operator.itemgetter(3), reverse=True)
+
 
 					elif data[0] == 'A':
 						# Auto mode
 						pass
 
 				else:
-					print "Communicate data type error"
+					print "Communicate data error"
 
 			client.close()
 
