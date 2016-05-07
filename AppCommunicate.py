@@ -23,6 +23,8 @@ class AppCommuniacteServerThread(threading.Thread):
 		self.current_temp = None
 		self.on_off = None
 		self.humidity = None
+		self.mode = None
+		self.ICL = None
 
 		self.fileName = 'userCommand.csv'
 		self.scheduleFile = 'scheduleTasks.csv'
@@ -48,7 +50,18 @@ class AppCommuniacteServerThread(threading.Thread):
 		s.listen(5)
 		print 'Socket listening ...'
 
-		while 1:
+		while True:
+			# ==================== Status Update ====================
+			self.update_current_temp()
+			self.update_desire_temp()
+			self.update_on_off()
+			self.update_humidity()
+			self.update_ICL()
+			self.update_mode()
+
+			# ==================== Communication ====================
+			# The client(socket) is closed everytime a communication ends
+			# A new client will be established for each communication
 			client, address = s.accept()
 			print 'Connection established with ' + str(address)
 			client.send("Welcome!")
@@ -99,22 +112,67 @@ class AppCommuniacteServerThread(threading.Thread):
 
 					elif data[0] == 'I':
 						# Remote turn on
-						
-
+						# Clear on_off_queue and put new status
+						pass
 
 					elif data[0] == 'O':
 						# Remote turn off
-
+						# Clear on_off_queue and put new status
+						pass
 
 					elif data[0] == 'A':
 						# Auto mode
-						# Enter auto mode
+						# Clear mode_queue and put new status
 						pass
 
 				else:
 					print "Communicate data error"
 
 			client.close()
+
+
+	def update_current_temp(self):
+		if not self.current_temp_queue.empty():
+			self.current_temp = self.current_temp_queue.get()
+			self.current_temp_queue.put(self.current_temp)
+		else:
+			print 'Error: current_temp_queue is empty when trying to get'
+
+	def update_desire_temp(self):
+		if not self.desire_temp_queue.empty():
+			self.desire_temp = self.desire_temp_queue.get()
+			self.desire_temp_queue.put(self.desire_temp)
+		else:
+			print 'Error: desire_temp_queue is empty when trying to get'
+
+	def update_on_off(self):
+		if not self.on_off_queue.empty():
+			self.on_off = self.on_off_queue.get()
+			self.on_off_queue.put(self.on_off)
+		else:
+			print 'Error: on_off_queue is empty when trying to get'
+
+	def update_humidity(self):
+		if not self.humidity_queue.empty():
+			self.humidity = self.humidity_queue.get()
+			self.humidity_queue.put(self.humidity)
+		else:
+			print 'Error: humidity_queue is empty when trying to get'
+
+	def update_ICL(self):
+		if not self.ICL_queue.empty():
+			self.ICL = self.ICL_queue.get()
+			self.ICL_queue.put(self.ICL)
+		else:
+			print 'Error: ICL_queue is empty when trying to get'
+
+	def update_mode(self):
+		if not self.mode_queue.empty():
+			self.mode = self.mode_queue.get()
+			self.mode_queue(self.mode)
+		else:
+			print 'Error: mode_queue is empty when trying to get'
+
 
 if __name__ == '__main__':
 	appThread = AppCommuniacteServerThread("AppCommunicateThread")
