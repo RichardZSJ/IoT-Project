@@ -36,6 +36,8 @@ class AppCommuniacteServerThread(threading.Thread):
 
 
 	def run(self):
+		time.sleep(5)
+		# Waiting for threads to start
 		print "Starting thread:", self.threadName + "..."
 		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		print 'Socket Created'
@@ -49,7 +51,6 @@ class AppCommuniacteServerThread(threading.Thread):
 		print 'Socket bind complete'
 		s.listen(5)
 		print 'Socket listening ...'
-
 		while True:
 			# ==================== Status Update ====================
 			self.update_current_temp()
@@ -64,7 +65,8 @@ class AppCommuniacteServerThread(threading.Thread):
 			# A new client will be established for each communication
 			client, address = s.accept()
 			print 'Connection established with ' + str(address)
-			client.send("Welcome!")
+			message = 
+			client.send(message)
 
 			data = client.recv(self.SIZE)
 			if data:

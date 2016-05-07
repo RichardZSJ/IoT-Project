@@ -1,8 +1,7 @@
 import time
 import sys
 import threading
-import RoomSensor
-import DoorSensor
+import MotionDetection
 import AppCommunicate
 import CityWeather
 import Temperature
@@ -17,10 +16,6 @@ desire_temp_queue = Queue.Queue()
 on_off_queue = Queue.Queue()
 mode_queue = Queue.Queue()
 ICL_queue = Queue.Queue()
-
-
-def is_people_in_room():
-	return (roomSensorThread.get_room_sensor_result() or doorSensorThread.get_door_sensor_result())
 
 
 class thermostat():
@@ -53,7 +48,7 @@ class thermostat():
 				# ==================== Execution ====================
 				print "People in room:", is_people_in_room()
 				print "Room temperature:", RoomSensor.get_room_temp()
-				
+
 				if self.mode == 'M' and self.on_off == 'ON':
 					print '========== Manual Mode =========='
 					print 'Current temperature:', self.current_temp
@@ -136,20 +131,17 @@ class thermostat():
 
 if __name__ == '__main__':
 	# Multithread
-	roomSensorThread = RoomSensor.RoomSensorThread("RoomSensorThread")
-	doorSensorThread = DoorSensor.DoorSensorThread("DoorSensorThread")
+	motionThread = MotionDetection.MotionThread("MotionThread")
 	appThread = AppCommunicate.AppCommuniacteServerThread("AppCommunicateThread")
 	tempThread = Temperature.TemperatureThread("TemperatureThread")
 	s3Thread = S3Upload.S3Uploader("S3Thread")
 
-	roomSensorThread.daemon = True
-	doorSensorThread.daemon = True
+	motionThread.daemon = True
 	appThread.daemon = True
 	tempThread.daemon = True
 	s3Thread.daemon = True
 
-	roomSensorThread.start()
-	doorSensorThread.start()
+	motionThread.start()
 	appThread.start()
 	tempThread.start()
 	s3Thread.start()
