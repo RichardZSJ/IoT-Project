@@ -8,53 +8,63 @@ import queue
 
 class AppCommuniacteServerThread(threading.Thread):
 	
-	def __init__(self, threadName, current_temp_queue, on_off_queue, desire_temp_queue, relative_humidity_queue, ICL_queue, mode_queue):
+	def __init__(self, threadName, current_temp_queue, on_off_queue, desire_temp_queue, humidity_queue, ICL_queue, mode_queue):
 		threading.Thread.__init__(self)
 		self.threadName = threadName
 
 		self.current_temp_queue = current_temp_queue
 		self.on_off_queue = on_off_queue
 		self.desire_temp_queue = desire_temp_queue
-		self.relative_humidity_queue = relative_humidity_queue
+		self.humidity_queue = humidity_queue
 		self.ICL_queue = ICL_queue
 		self.mode_queue = mode_queue
+
+		self.desire_temp = None
+		self.current_temp = None
+		self.on_off = None
+		self.humidity = None
 
 		self.fileName = 'userCommand.csv'
 		self.scheduleFile = 'scheduleTasks.csv'
 		self.HOST = '209.2.212.58'			# Server host
 		self.PORT = 8888					# Server port
-		self.BACKLOG = 10
 		self.SIZE = 1024					# message size
 		self.cols_user_command = ['TimeStamp', 'Mode', 'AdjustTempTo', 'ScheduleTime']
 		self.cols_schedule = ['ScheduleTime', 'AdjustTempTo']
+
 
 	def run(self):
 		print "Starting thread:", self.threadName + "..."
 		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		print 'Socket Created'
-
 		try:
 			s.bind((self.HOST, self.PORT))
-			s.listen(self.BACKLOG)
-		except:
-			print "Fail to bind host and port, change host address"
-			exit()
+		except socket.error as msg:
+			print 'Bind failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
+			print "Have you change the host address?"
+			sys.exit()
+
+		print 'Socket bind complete'
+		s.listen(5)
+		print 'Socket listening ...'
 
 		while 1:
 			client, address = s.accept()
+			print 'Connection established with ' + str(address)
+			client.send("Welcome!")
 
 			data = client.recv(self.SIZE)
 			if data:
 				# When receving message
-				# Retrive data, log data to file, execute command.
+				# Retrive data, log data to file, update queue.
 				if type(data) is str:
 					print "App message received:", data
 					# First character in data indicates mode.
 					if data[0] == 'M':
 						# Manual mode
-						self.setTemp = int(data[1:3])
-						print "Execution: set temperature to", self.setTemp
-						commandDict = {'TimeStamp': int(time.time()), 'Mode': 'Manual', 'AdjustTempTo': self.setTemp}
+						self.desire_temp = int(data[1:3])
+						print "Execution: set temperature to", self.desire_temp
+						commandDict = {'TimeStamp': int(time.time()), 'Mode': 'Manual', 'AdjustTempTo': self.desire_temp}
 						with open(self.fileName, 'a') as csvfile:
 							writer = csv.DictWriter(csvfile, fieldnames=self.cols_user_command, lineterminator='\n')
 							writer.writerow(commandDict)
@@ -62,17 +72,17 @@ class AppCommuniacteServerThread(threading.Thread):
 
 					elif data[0] == 'S':
 						# Schedule task
-						self.setTemp = int(data[1:3])
+						self.desire_temp = int(data[1:3])
 						unixScheduleTime = int(data[3:])
 						datetimeTaskTime = datetime.datetime.fromtimestamp(unixScheduleTime).strftime('%Y-%m-%d %H:%M:%S')
-						print "Schedule Task @ " + str(datetimeTaskTime) + ", set temperature to", self.setTemp
-						commandDict = {'TimeStamp': int(time.time()), 'Mode': 'Schedule', 'AdjustTempTo': self.setTemp, 'ScheduleTime': unixScheduleTime}
+						print "Schedule Task @ " + str(datetimeTaskTime) + ", set temperature to", self.desire_temp
+						commandDict = {'TimeStamp': int(time.time()), 'Mode': 'Schedule', 'AdjustTempTo': self.desire_temp, 'ScheduleTime': unixScheduleTime}
 						with open(self.fileName, 'a') as csvfile:
 							writer = csv.DictWriter(csvfile, fieldnames=self.cols_user_command, lineterminator='\n')
 							writer.writerow(commandDict)
 						print "Logged user command to " + self.fileName
 
-						scheduleDict = {'ScheduleTime': unixScheduleTime, 'AdjustTempTo': self.setTemp}
+						scheduleDict = {'ScheduleTime': unixScheduleTime, 'AdjustTempTo': self.desire_temp}
 						with open(self.scheduleFile, 'a') as csvfile:
 							writer = csv.DictWriter(csvfile, fieldnames=self.cols_schedule, lineterminator='\n')
 							writer.writerow(commandDict)

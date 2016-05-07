@@ -12,7 +12,7 @@ import Queue
 
 # Signal defination
 current_temp_queue = Queue.Queue()
-relative_humidity_queue = Queue.Queue()
+humidity_queue = Queue.Queue()
 desire_temp_queue = Queue.Queue()
 on_off_queue = Queue.Queue()
 mode_queue = Queue.Queue()
@@ -24,34 +24,101 @@ def is_people_in_room():
 
 
 class thermostat():
-	def __init__(self, current_temp_queue, on_off_queue, desire_temp_queue, relative_humidity_queue, ICL_queue, mode_queue):
+	def __init__(self, current_temp_queue, on_off_queue, desire_temp_queue, humidity_queue, ICL_queue, mode_queue):
 		self.current_temp_queue = current_temp_queue
 		self.on_off_queue = on_off_queue
 		self.desire_temp_queue = desire_temp_queue
-		self.relative_humidity_queue = relative_humidity_queue
+		self.humidity_queue = humidity_queue
 		self.ICL_queue = ICL_queue
 		self.mode_queue = mode_queue
 
+		self.current_temp = None
+		self.on_off = None
+		self.desire_temp = None
+		self.humidity = None
+		self.ICL = None
+		self.mode = "M"
+
 	def run():
 		try:
-			while 1:
+			while True:
+				# Status update
+				self.update_current_temp()
+				self.update_desire_temp()
+				self.update_on_off()
+				self.update_humidity()
+				self.update_ICL()
+				self.update_mode()
+
+				# Execution
 				print "People in room:", is_people_in_room()
 				print "Room temperature:", RoomSensor.get_room_temp()
-				time.sleep(1)
+				
+				if self.mode == 'M' and self.on_off == 'ON':
+					print '========== Manual Mode =========='
+					print 'Current temperature:', self.current_temp
+					print 'Desire temperature:', self.desire_temp
+
+					if (self.current_temp - self.desire_temp) > 0.5:
+						print 'Current temperature too high'
+						print '***** COOLING *****'
+
+					elif (self.desire_temp - self.current_temp) > 0.5:
+						print 'Current temperature too low'
+						print '***** HEATING *****'
+
+					else:
+						print 'Current temperature matches desire temperature'
+
+				elif self.mode == 'A' and self.on_off == 'ON':
+					print '========== Smart Mode =========='
+					print 'Current temperature:', self.current_temp
+					print 'Desire temperature:', self.desire_temp
+
+					if (self.current_temp - self.desire_temp) > 0.5:
+						print 'Current temperature too high'
+						print '***** COOLING *****'
+
+					elif (self.desire_temp - self.current_temp) > 0.5:
+						print 'Current temperature too low'
+						print '***** HEATING *****'
+
+				elif self.on_off == 'OFF':
+					print 'Thermostat OFF'
+
+				time.sleep(10)
 		except KeyboardInterrupt:
 			exit(1)
 
-	def turn_on(self):
-		self.on_off = True
+	def update_current_temp(self):
+		if not self.current_temp_queue.empty():
+			self.current_temp = self.current_temp_queue.get()
+			self.current_temp_queue.put(self.current_temp)
 
-	def turn_off(self):
-		self.on_off = False
+	def update_desire_temp(self):
+		if not self.desire_temp_queue.empty():
+			self.desire_temp = self.desire_temp_queue.get()
+			self.desire_temp_queue.put(self.desire_temp)
 
-	def set_desire_temp(desire_temp):
-		self.desire_temp = desire_temp
+	def update_on_off(self):
+		if not self.on_off_queue.empty():
+			self.on_off = self.on_off_queue.get()
+			self.on_off_queue.put(self.on_off)
 
-	def set_mode(mode):
-		self.mode = mode
+	def update_humidity(self):
+		if not self.humidity_queue.empty():
+			self.humidity = self.humidity_queue.get()
+			self.humidity_queue.put(self.humidity)
+
+	def update_ICL(self):
+		if not self.ICL_queue.empty():
+			self.ICL = self.ICL_queue.get()
+			self.ICL_queue.put(self.ICL)
+
+	def update_mode(self):
+		if not self.mode_queue.empty():
+			self.mode = self.mode_queue.get()
+			self.mode_queue(self.mode)
 
 
 if __name__ == '__main__':
@@ -74,6 +141,6 @@ if __name__ == '__main__':
 	tempThread.start()
 	s3Thread.start()
 
-	thermostat_ins = thermostat(current_temp_queue, on_off_queue, desire_temp_queue, relative_humidity_queue, ICL_queue, mode_queue)
+	thermostat_ins = thermostat(current_temp_queue, on_off_queue, desire_temp_queue, humidity_queue, ICL_queue, mode_queue)
 	thermostat_ins.run()
 	
