@@ -10,10 +10,11 @@ def get_weather(city):
 	if city in CITY_DICT:
 		observation = owm.weather_at_id(CITY_DICT[city])
 		weather = observation.get_weather()
-		response['status'] = str(weather.get_detailed_status())
+		response['status'] = str(weather.get_status())
 		response['wind speed'] = str(weather.get_wind()['speed'])
 		response['humidity'] = str(weather.get_humidity())
 		response['temperature'] = weather.get_temperature('celsius')
+		print response
 		return response
 
 	else:

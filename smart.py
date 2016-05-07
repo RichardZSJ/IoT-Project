@@ -6,8 +6,8 @@ from sympy.solvers import solve
 from sympy import Symbol
 import random
 import numpy as np
-from sklearn.linear_model import Ridge
-import matplotlib.pyplot as plt
+#from sklearn.linear_model import Ridge
+#import matplotlib.pyplot as plt
 import time
 import datetime
 from math import log
@@ -42,11 +42,25 @@ class temp2():
 
 USER_TEMP = 25
 ICL = "A"
-RH = 0.5
+RH = 0.7
 
 tempSensorPin = 1
 fileName = 'environmentData.csv'
-cols = ['timestamp', 'room_temp', 'room_humidity', 'outdoor_temp', 'outdoor_humidity']
+#cols = ['timestamp', 'room_temp', 'room_humidity', 'outdoor_temp', 'outdoor_humidity']
+cols = ['response', 'RH', 'T0', 'T1', 'T2', 'outdoor_temp', 'outdoor_humidity', 'w0', 'w1', 'w2']
+
+
+def train():
+	DATA = []
+	with open('environmentData.csv', 'rb') as csvfile:
+		reader = csv.reader(csvfile, delimiter=' ', quotechar='|')
+		for row in reader: 
+			DATA.append(eval(row[0]))
+	DATA = np.matrix(DATA)
+	y = DATA[:,0]
+	X = DATA[:,1:]
+	return (y, X)
+
 
 class TemperatureThread(threading.Thread):
 	def __init__(self, threadName):
@@ -75,12 +89,12 @@ class TemperatureThread(threading.Thread):
 			if (now.hour in range(18,23)):
 				#self.tempDict['timestamp'] = '18-24'
 				T0,T1,T2 = 0,0,0
-			elf.tempDict['T0'], self.tempDict['T1'], self.tempDict['T2'] = T0, T1, T2
+			self.tempDict['T0'], self.tempDict['T1'], self.tempDict['T2'] = T0, T1, T2
 
 			cityWeather = CityWeather.get_weather('New York')					
 			#self.tempDict['room_temp'] = int(get_room_temp())
 			self.tempDict['outdoor_temp'] = int(cityWeather['temperature']['temp'])
-			self.tempDict['outdoor_humidity'] = int(cityWeather['humidity'])
+			self.tempDict['outdoor_humidity'] = float(cityWeather['humidity']) * 0.01
 			status = cityWeather['status']
 			if status == 'Clear':
 				w0,w1,w2 = 1,0,0

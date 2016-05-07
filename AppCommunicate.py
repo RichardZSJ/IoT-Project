@@ -4,17 +4,24 @@ import csv
 import time
 import datetime
 import os
+import queue
 
 class AppCommuniacteServerThread(threading.Thread):
 	
-	def __init__(self, threadName):
+	def __init__(self, threadName, current_temp_queue, on_off_queue, desire_temp_queue, relative_humidity_queue, ICL_queue, mode_queue):
 		threading.Thread.__init__(self)
 		self.threadName = threadName
-		self.mode = None
-		self.setTemp = None
-		self.currentTemp = None
+
+		self.current_temp_queue = current_temp_queue
+		self.on_off_queue = on_off_queue
+		self.desire_temp_queue = desire_temp_queue
+		self.relative_humidity_queue = relative_humidity_queue
+		self.ICL_queue = ICL_queue
+		self.mode_queue = mode_queue
+
 		self.fileName = 'userCommand.csv'
-		self.HOST = '209.2.212.58'		# Server host
+		self.scheduleFile = 'scheduleTasks.csv'
+		self.HOST = '209.2.212.58'			# Server host
 		self.PORT = 8888					# Server port
 		self.BACKLOG = 10
 		self.SIZE = 1024					# message size
@@ -35,7 +42,7 @@ class AppCommuniacteServerThread(threading.Thread):
 
 		while 1:
 			client, address = s.accept()
-			
+
 			data = client.recv(self.SIZE)
 			if data:
 				# When receving message
@@ -48,8 +55,8 @@ class AppCommuniacteServerThread(threading.Thread):
 						self.setTemp = int(data[1:3])
 						print "Execution: set temperature to", self.setTemp
 						commandDict = {'TimeStamp': int(time.time()), 'Mode': 'Manual', 'AdjustTempTo': self.setTemp}
-						with open(fileName, 'a') as csvfile:
-							writer = csv.DictWriter(csvfile, fieldnames = cols_user_command, lineterminator='\n')
+						with open(self.fileName, 'a') as csvfile:
+							writer = csv.DictWriter(csvfile, fieldnames=self.cols_user_command, lineterminator='\n')
 							writer.writerow(commandDict)
 						print "Logged user command to " + self.fileName
 
@@ -59,18 +66,39 @@ class AppCommuniacteServerThread(threading.Thread):
 						unixScheduleTime = int(data[3:])
 						datetimeTaskTime = datetime.datetime.fromtimestamp(unixScheduleTime).strftime('%Y-%m-%d %H:%M:%S')
 						print "Schedule Task @ " + str(datetimeTaskTime) + ", set temperature to", self.setTemp
-						commandDict = {'Mode': 'Schedule', 'setTemp': self.setTemp, 'Time': unixTaskTime}
-
-						with open(fileName, 'a') as csvfile:
-							writer = csv.DictWriter(csvfile, fieldnames=cols, lineterminator='\n')
+						commandDict = {'TimeStamp': int(time.time()), 'Mode': 'Schedule', 'AdjustTempTo': self.setTemp, 'ScheduleTime': unixScheduleTime}
+						with open(self.fileName, 'a') as csvfile:
+							writer = csv.DictWriter(csvfile, fieldnames=self.cols_user_command, lineterminator='\n')
 							writer.writerow(commandDict)
 						print "Logged user command to " + self.fileName
-						reader = csv.reader(open(self.fileName))
-						sortedSchedule = sorted(reader, key=operator.itemgetter(3), reverse=True)
+
+						scheduleDict = {'ScheduleTime': unixScheduleTime, 'AdjustTempTo': self.setTemp}
+						with open(self.scheduleFile, 'a') as csvfile:
+							writer = csv.DictWriter(csvfile, fieldnames=self.cols_schedule, lineterminator='\n')
+							writer.writerow(commandDict)
+						reader = csv.reader(open(self.scheduleFile))
+						sortedSchedule = sorted(reader, key=operator.itemgetter(0), reverse=False)
+						try:
+							os.remove(self.scheduleFile)
+						except:
+							pass
+						with open(self.scheduleFile, 'a') as csvfile:
+							writer = csv.DictWriter(csvfile, fieldnames=self.cols_schedule, lineterminator='\n')
+							for row in sortedSchedule:
+								writer.writerow({'ScheduleTime': row[0], 'AdjustTempTo': row[1]})
+
+					elif data[0] == 'I':
+						# Remote turn on
+						
+
+
+					elif data[0] == 'O':
+						# Remote turn off
 
 
 					elif data[0] == 'A':
 						# Auto mode
+						# Enter auto mode
 						pass
 
 				else:
@@ -80,4 +108,10 @@ class AppCommuniacteServerThread(threading.Thread):
 
 if __name__ == '__main__':
 	appThread = AppCommuniacteServerThread("AppCommunicateThread")
+	appThread.daemon = True
 	appThread.start()
+	try:
+		while True:
+			time.sleep(10)
+	except KeyboardInterrupt:
+		exit()
