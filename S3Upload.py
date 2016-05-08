@@ -18,8 +18,7 @@ class S3Uploader(threading.Thread):
 	trainingData = None
 	INTERVAL = 3600
 
-
-	def __init__(self, trainingData, threadName):
+	def __init__(self, threadName, trainingData = FILENAME):
 		threading.Thread.__init__(self)
 		self.S3 = aws.getResource('s3','us-east-1')
 		self.trainingData = trainingData
@@ -28,8 +27,8 @@ class S3Uploader(threading.Thread):
 	def run(self):
 		print "Starting thread:", self.threadName + "..."
 		while True:
-			self.uploadData()
 			time.sleep(self.INTERVAL)
+			self.uploadData()
 
 	def uploadData(self):
 
@@ -58,7 +57,7 @@ class S3Uploader(threading.Thread):
 
 
 if __name__ == "__main__":
-	s3Thread = S3Uploader(FILENAME, "S3Thread")
+	s3Thread = S3Uploader("S3Thread", FILENAME)
 	s3Thread.deamon = True
 	s3Thread.start()
 	try:

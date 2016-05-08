@@ -7,14 +7,15 @@ from sympy import Symbol
 import random
 import numpy as np
 #from sklearn.linear_model import Ridge
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import time
 import datetime
 from math import log
 import threading
 import CityWeather
 import csv
-
+from numpy.linalg import inv
+from math import exp
 
 Icl_table = {"A":0.96, "B":0.726, "C":1.089}
 
@@ -33,24 +34,30 @@ class temp2():
 		self.hc = 12.1*sqrt(self.V)
 		self.W = 0.0
 	def solve(self):
-		self.A = 35.7 - 0.0275*(self.M - self.W) - self.Rcl * ((self.M - self.W) - 3.05 * (5.73 - 0.007 * (self.M - self.W) - 2.96*self.Rh) - 0.42 * ((self.M - self.W) - 58.15) - 0.0173*self.M*(5.87 - 2.96*self.Rh) - 0.0476 * self.M)
+		self.A = 35.7 - 0.0275*(self.M - self.W) - self.Rcl * ((self.M - self.W) - 3.05 * (5.73 - 0.007 * \
+			(self.M - self.W) - 2.96*self.Rh) - 0.42 * ((self.M - self.W) - 58.15) - \
+			0.0173*self.M*(5.87 - 2.96*self.Rh) - 0.0476 * self.M)
 		self.B = 0.0014 * self.M * self.Rcl
-		self.C = (self.M - self.W) - self.fcl * self.hc * self.A - 3.05*(5.73 - 0.007*(self.M - self.W) - 2.96*self.Rh) - 0.42*(self.M - self.W - 58.15) - 0.0173*self.M*(5.87-self.Rh) - 34*0.0014*self.M
+		self.C = (self.M - self.W) - self.fcl * self.hc * self.A - 3.05*(5.73 - 0.007*(self.M - self.W) - 2.96*self.Rh) - \
+		0.42*(self.M - self.W - 58.15) - 0.0173*self.M*(5.87-self.Rh) - 34*0.0014*self.M
 		self.ta = -self.C/(0.0015*self.M + self.fcl*self.hc*(self.B+1))
 		return self.ta
 
 
 USER_TEMP = 25
 ICL = "A"
-RH = 0.7
+RH = 0.5
 
 tempSensorPin = 1
 fileName = 'environmentData.csv'
-#cols = ['timestamp', 'room_temp', 'room_humidity', 'outdoor_temp', 'outdoor_humidity']
-cols = ['response', 'RH', 'T0', 'T1', 'T2', 'outdoor_temp', 'outdoor_humidity', 'w0', 'w1', 'w2']
+#cols = ['timestamp', 'room_temp', 'room_humidity', 'outdoor_temp', 
+'outdoor_humidity']
+cols = ['response', '1', 'RH', 'T0', 'T1', 'T2', 'outdoor_temp', 
+'outdoor_humidity', 'w0', 'w1', 'w2']
 
 
 def train():
+	lam = 1.0
 	DATA = []
 	with open('environmentData.csv', 'rb') as csvfile:
 		reader = csv.reader(csvfile, delimiter=' ', quotechar='|')
@@ -59,21 +66,24 @@ def train():
 	DATA = np.matrix(DATA)
 	y = DATA[:,0]
 	X = DATA[:,1:]
-	return (y, X)
-
+	#X = np.concatenate((np.matrix([1 for i in range(X.shape[0])]),X.T)).T
+	tmp = inv(np.dot(X.T, X) + lam * np.identity(X.shape[1]))
+	coef = tmp.dot(X.T).dot(y)
+	return coef
 
 class TemperatureThread(threading.Thread):
 	def __init__(self, threadName):
 		threading.Thread.__init__(self)
 		self.threadName = threadName
 		self.tempDict = {}
-
+		self.start = int(time.time())
 	def run(self):
 		while 1:
 			ta = temp2(ICL, RH).solve()
 			response = USER_TEMP - ta
 			self.tempDict['response'] = response
 			#self.tempDict['ICL'] = ICL
+			self.tempDict['1'] = 1.0
 			self.tempDict['RH'] = RH
 
 			now = datetime.datetime.now()
@@ -111,6 +121,72 @@ class TemperatureThread(threading.Thread):
 				writer = csv.DictWriter(csvfile, fieldnames = cols)
 				writer.writerow(self.tempDict)
 			time.sleep(5)
+
+			if int(time.time()) - self.start >= 604800:
+				coef = train()
+				implementThread = ImplementThread('implementThread', coef)
+				implementThread.daemon = True
+				implementThread.start()
+				break
+
+def ImplementThread(TemperatureThread):
+	def __init__(self, threadName, coef):
+		TemperatureThread.__init__(self, threadName)
+		self.coef = coef
+		self.w = 1.0
+	def run(self):
+		while 1:
+			#Collect data and do prediction
+			ta = temp2(ICL, RH).solve()
+			#self.tempDict['ICL'] = ICL
+			self.tempDict['1'] = 1.0
+			self.tempDict['RH'] = RH
+
+			now = datetime.datetime.now()
+			if (now.hour in range(0,5)):
+				#self.tempDict['timestamp'] = '0-6'
+				T0,T1,T2 = 1,0,0
+			if (now.hour in range(6,11)):
+				#self.tempDict['timestamp'] = '6-12'
+				T0,T1,T2 = 0,1,0
+			if (now.hour in range(12,17)):
+				#self.tempDict['timestamp'] = '12-18'
+				T0,T1,T2 = 0,0,1
+			if (now.hour in range(18,23)):
+				#self.tempDict['timestamp'] = '18-24'
+				T0,T1,T2 = 0,0,0
+			self.tempDict['T0'], self.tempDict['T1'], self.tempDict['T2'] = T0, T1, T2
+
+			cityWeather = CityWeather.get_weather('New York')					
+			#self.tempDict['room_temp'] = int(get_room_temp())
+			self.tempDict['outdoor_temp'] = int(cityWeather['temperature']['temp'])
+			self.tempDict['outdoor_humidity'] = float(cityWeather['humidity']) * 0.01
+			status = cityWeather['status']
+			if status == 'Clear':
+				w0,w1,w2 = 1,0,0
+			elif status == 'Clouds':
+				w0,w1,w2 = 0,1,0
+			elif status == 'Rain':
+				w0,w1,w2 = 0,0,1
+			else:
+				w0,w1,w2 = 0,0,0
+			self.tempDict['w0'], self.tempDict['w1'], self.tempDict['w2'] = w0, w1, w2
+
+			#If the absolute value between prediction and the current temperature is greater then 1, then set the temperature as prediction value
+			delta = self.coef.dot(np.matrix[1.0, RH, T0, T1, T2, self.tempDict['outdoor_temp'], self.tempDict['outdoor_humidity'], w0, w1, w2])[0,0]
+			prediction = delta + ta
+			if abs(prediction - USER_TEMP) > 1:
+				USER_TEMP = prediction
+
+			#If user change the temperature, then collect this data point, and give a weight(exp increasing)
+			#Add it to csv file, and call self.coef = train()
+			self.w = exp(2.0*(int(time.time()) - self.start)/604800.0)
+
+			# print self.tempDict
+			# with open(fileName, 'a') as csvfile:
+			# 	writer = csv.DictWriter(csvfile, fieldnames = cols)
+			# 	writer.writerow(self.tempDict)
+			time.sleep(5)		
 
 def get_room_temp():
 	tempSensor = mraa.Aio(tempSensorPin)
