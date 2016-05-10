@@ -1,3 +1,4 @@
+import Queue
 import cmath
 import math
 from math import sqrt
@@ -7,7 +8,7 @@ from sympy import Symbol
 import random
 import numpy as np
 #from sklearn.linear_model import Ridge
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import time
 import datetime
 from math import log
@@ -34,35 +35,30 @@ class temp2():
 		self.hc = 12.1*sqrt(self.V)
 		self.W = 0.0
 	def solve(self):
-		self.A = 35.7 - 0.0275*(self.M - self.W) - self.Rcl * ((self.M - self.W) - 3.05 * (5.73 - 0.007 * \
-			(self.M - self.W) - 2.96*self.Rh) - 0.42 * ((self.M - self.W) - 58.15) - \
-			0.0173*self.M*(5.87 - 2.96*self.Rh) - 0.0476 * self.M)
+		self.A = 35.7 - 0.0275*(self.M - self.W) - self.Rcl * ((self.M - self.W) - 3.05 * (5.73 - 0.007 * (self.M - self.W) - 2.96*self.Rh) - 0.42 * ((self.M - self.W) - 58.15) - 0.0173*self.M*(5.87 - 2.96*self.Rh) - 0.0476 * self.M)
 		self.B = 0.0014 * self.M * self.Rcl
-		self.C = (self.M - self.W) - self.fcl * self.hc * self.A - 3.05*(5.73 - 0.007*(self.M - self.W) - 2.96*self.Rh) - \
-		0.42*(self.M - self.W - 58.15) - 0.0173*self.M*(5.87-self.Rh) - 34*0.0014*self.M
+		self.C = (self.M - self.W) - self.fcl * self.hc * self.A - 3.05*(5.73 - 0.007*(self.M - self.W) - 2.96*self.Rh) - 0.42*(self.M - self.W - 58.15) - 0.0173*self.M*(5.87-self.Rh) - 34*0.0014*self.M
 		self.ta = -self.C/(0.0015*self.M + self.fcl*self.hc*(self.B+1))
 		return self.ta
 
 
-USER_TEMP = 25
-ICL = "A"
-RH = 0.5
+#USER_TEMP = 25
+ICL = "B"
+#RH = 0.5
 
 tempSensorPin = 1
 fileName = 'environmentData.csv'
-#cols = ['timestamp', 'room_temp', 'room_humidity', 'outdoor_temp', 
-'outdoor_humidity']
-cols = ['response', '1', 'RH', 'T0', 'T1', 'T2', 'outdoor_temp', 
-'outdoor_humidity', 'w0', 'w1', 'w2']
+cols = ['response', '1', 'RH', 'T0', 'T1', 'T2', 'outdoor_temp', 'outdoor_humidity', 'w0', 'w1', 'w2']
 
 
 def train():
+	print 'training!'
 	lam = 1.0
 	DATA = []
-	with open('environmentData.csv', 'rb') as csvfile:
+	with open('environmentData.csv', 'r') as csvfile:
 		reader = csv.reader(csvfile, delimiter=' ', quotechar='|')
 		for row in reader: 
-			DATA.append(eval(row[0]))
+			DATA.append(list(eval(row[0])))
 	DATA = np.matrix(DATA)
 	y = DATA[:,0]
 	X = DATA[:,1:]
@@ -71,122 +67,77 @@ def train():
 	coef = tmp.dot(X.T).dot(y)
 	return coef
 
-class TemperatureThread(threading.Thread):
-	def __init__(self, threadName):
+
+
+class ImplementThread(threading.Thread):
+	def __init__(self, threadName, desire_temp_queue, humidity_queue, mode_queue, feature_queue, user_change_queue):
 		threading.Thread.__init__(self)
-		self.threadName = threadName
-		self.tempDict = {}
-		self.start = int(time.time())
-	def run(self):
-		while 1:
-			ta = temp2(ICL, RH).solve()
-			response = USER_TEMP - ta
-			self.tempDict['response'] = response
-			#self.tempDict['ICL'] = ICL
-			self.tempDict['1'] = 1.0
-			self.tempDict['RH'] = RH
-
-			now = datetime.datetime.now()
-			if (now.hour in range(0,5)):
-				#self.tempDict['timestamp'] = '0-6'
-				T0,T1,T2 = 1,0,0
-			if (now.hour in range(6,11)):
-				#self.tempDict['timestamp'] = '6-12'
-				T0,T1,T2 = 0,1,0
-			if (now.hour in range(12,17)):
-				#self.tempDict['timestamp'] = '12-18'
-				T0,T1,T2 = 0,0,1
-			if (now.hour in range(18,23)):
-				#self.tempDict['timestamp'] = '18-24'
-				T0,T1,T2 = 0,0,0
-			self.tempDict['T0'], self.tempDict['T1'], self.tempDict['T2'] = T0, T1, T2
-
-			cityWeather = CityWeather.get_weather('New York')					
-			#self.tempDict['room_temp'] = int(get_room_temp())
-			self.tempDict['outdoor_temp'] = int(cityWeather['temperature']['temp'])
-			self.tempDict['outdoor_humidity'] = float(cityWeather['humidity']) * 0.01
-			status = cityWeather['status']
-			if status == 'Clear':
-				w0,w1,w2 = 1,0,0
-			elif status == 'Clouds':
-				w0,w1,w2 = 0,1,0
-			elif status == 'Rain':
-				w0,w1,w2 = 0,0,1
-			else:
-				w0,w1,w2 = 0,0,0
-			self.tempDict['w0'], self.tempDict['w1'], self.tempDict['w2'] = w0, w1, w2
-
-			# print self.tempDict
-			with open(fileName, 'a') as csvfile:
-				writer = csv.DictWriter(csvfile, fieldnames = cols)
-				writer.writerow(self.tempDict)
-			time.sleep(5)
-
-			if int(time.time()) - self.start >= 604800:
-				coef = train()
-				implementThread = ImplementThread('implementThread', coef)
-				implementThread.daemon = True
-				implementThread.start()
-				break
-
-def ImplementThread(TemperatureThread):
-	def __init__(self, threadName, coef):
-		TemperatureThread.__init__(self, threadName)
-		self.coef = coef
+		self.starttime = int(time.time())
+		self.trainFlag = True
 		self.w = 1.0
+		self.desire_temp_queue = desire_temp_queue
+		self.humidity_queue = humidity_queue
+		self.mode_queue = mode_queue
+		self.feature_queue = feature_queue
+		self.user_change_queue = user_change_queue
+
 	def run(self):
 		while 1:
-			#Collect data and do prediction
-			ta = temp2(ICL, RH).solve()
-			#self.tempDict['ICL'] = ICL
-			self.tempDict['1'] = 1.0
-			self.tempDict['RH'] = RH
-
-			now = datetime.datetime.now()
-			if (now.hour in range(0,5)):
-				#self.tempDict['timestamp'] = '0-6'
-				T0,T1,T2 = 1,0,0
-			if (now.hour in range(6,11)):
-				#self.tempDict['timestamp'] = '6-12'
-				T0,T1,T2 = 0,1,0
-			if (now.hour in range(12,17)):
-				#self.tempDict['timestamp'] = '12-18'
-				T0,T1,T2 = 0,0,1
-			if (now.hour in range(18,23)):
-				#self.tempDict['timestamp'] = '18-24'
-				T0,T1,T2 = 0,0,0
-			self.tempDict['T0'], self.tempDict['T1'], self.tempDict['T2'] = T0, T1, T2
-
-			cityWeather = CityWeather.get_weather('New York')					
-			#self.tempDict['room_temp'] = int(get_room_temp())
-			self.tempDict['outdoor_temp'] = int(cityWeather['temperature']['temp'])
-			self.tempDict['outdoor_humidity'] = float(cityWeather['humidity']) * 0.01
-			status = cityWeather['status']
-			if status == 'Clear':
-				w0,w1,w2 = 1,0,0
-			elif status == 'Clouds':
-				w0,w1,w2 = 0,1,0
-			elif status == 'Rain':
-				w0,w1,w2 = 0,0,1
+			#READ sMODE from que
+			MODE = get_queue(self.mode_queue)
+			#if int(time.time()) - self.starttime <= 604800:
+			if int(time.time()) - self.starttime <= 5:
+				print 'waiting!'
+				#time.sleep(100)
+				time.sleep(1)
+			elif MODE is not "S":
+				time.sleep(1)
 			else:
-				w0,w1,w2 = 0,0,0
-			self.tempDict['w0'], self.tempDict['w1'], self.tempDict['w2'] = w0, w1, w2
+				self.w = exp(2.0*(int(time.time()) - self.starttime)/604800.0)
+				print self.w
+				if self.trainFlag == True:
+					self.coef = train()
+					self.trainFlag = False
+				#Retrieve features from que
+				data = get_queue(self.feature_queue)
+				data = np.matrix(data)
+				delta = self.coef.dot(data)[0,0]
+				ta = temp2(ICL, data[0,1]).solve()
+				prediction = delta + ta
+				#Read desired_temp from que(desired_temp)
+				desired_temp = get_queue(self.desire_temp_queue)
+				if abs(prediction - desired_temp) >= 1.0:
+					#SET desired_temp as prediction
+					put_queue(self.desire_temp_queue, prediction)
+				#READ user change signal(SIGNAL) from que:
+				if not self.user_change_queue.empty():
+					self.user_change_queue.get()
+					#Read desired_temp from que(desired_temp)
+					tempDict = {'response':(desired_temp - ta)*self.w, '1':1.0*self.w, 'RH':data[0,1]*self.w, 'T0':data[0,2]*self.w,'T1':data[0,3]*self.w,'T2':data[0,4]*self.w, 'outdoor_temp':data[0,5]*self.w, 'outdoor_humidity':data[0,6]*self.w, 'w0':data[0,7]*self.w, 'w1':data[0,8]*self.w, 'w2':data[0,9]*self.w}
+					with open(fileName, 'a') as csvfile:
+						writer = csv.DictWriter(csvfile, fieldnames = cols)
+						writer.writerow(tempDict)
+						self.trainFlag = True
 
-			#If the absolute value between prediction and the current temperature is greater then 1, then set the temperature as prediction value
-			delta = self.coef.dot(np.matrix[1.0, RH, T0, T1, T2, self.tempDict['outdoor_temp'], self.tempDict['outdoor_humidity'], w0, w1, w2])[0,0]
-			prediction = delta + ta
-			if abs(prediction - USER_TEMP) > 1:
-				USER_TEMP = prediction
+				time.sleep(5)
 
-			#If user change the temperature, then collect this data point, and give a weight(exp increasing)
-			#Add it to csv file, and call self.coef = train()
-			self.w = exp(2.0*(int(time.time()) - self.start)/604800.0)
 
-			# print self.tempDict
-			# with open(fileName, 'a') as csvfile:
-			# 	writer = csv.DictWriter(csvfile, fieldnames = cols)
-			# 	writer.writerow(self.tempDict)
-			time.sleep(5)		
+
+def get_queue(queue):
+	if not queue.empty():
+		data = queue.get()
+		queue.put(data)
+		return data
+	else:
+		print 'Error: queue is empty when trying to get, waiting to re-get'
+		time.sleep(0.5)
+		get_queue(queue)
+
+def put_queue(queue, data):
+	while not queue.empty():
+		queue.get()
+	queue.put(data)
+
 
 def get_room_temp():
 	tempSensor = mraa.Aio(tempSensorPin)
@@ -205,9 +156,25 @@ def get_room_humidity():
 
 
 if __name__ == '__main__':
-	tempThread = TemperatureThread('tempThread')
-	tempThread.daemon = True
-	tempThread.start()
+        current_temp_queue = Queue.Queue()
+        on_off_queue = Queue.Queue()
+        desire_temp_queue = Queue.Queue()
+        humidity_queue = Queue.Queue()
+        mode_queue = Queue.Queue()
+	feature_queue = Queue.Queue()
+	user_change_queue = Queue.Queue()
+
+        current_temp_queue.put(float(25.5))
+        on_off_queue.put("ON")
+        desire_temp_queue.put(float(26.5))
+        humidity_queue.put(int(70))
+        mode_queue.put("S")
+	feature_queue.put([1.0,0.3,1,0,0,24.0,30, 0,1,0])
+	user_change_queue.put(False)
+
+	implementThread = ImplementThread('implementThread', desire_temp_queue, humidity_queue, mode_queue, feature_queue, user_change_queue)
+	implementThread.daemon = True
+	implementThread.start()
 	try:
 		while 1:
 			pass

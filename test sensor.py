@@ -1,17 +1,28 @@
 import mraa
 import time
 
-sensorPin = 7;
-
-motion_seneor = mraa.Gpio(sensorPin)
-motion_seneor.dir(mraa.DIR_IN)
+RedPin = 3
+BluePin = 4
+# humidity_seneor = mraa.Gpio(sensorPin)
+# humidity_seneor.dir(mraa.DIR_IN)
 i = 0
 
+redLED = mraa.Gpio(RedPin)
+blueLED = mraa.Gpio(BluePin)
+
+redLED.dir(mraa.DIR_OUT)
+blueLED.dir(mraa.DIR_OUT)
+
 try:
-    while (1):
-        if (motion_seneor.read()):
-            print 'Motion detected ', i
-            i += 1
-            time.sleep(0.1)
+	while (1):
+		redLED.write(True)
+		blueLED.write(False)
+		time.sleep(1)
+		redLED.write(False)
+		blueLED.write(True)
+		time.sleep(1)
+
 except KeyboardInterrupt:
-        exit
+	redLED.write(False)
+	blueLED.write(False)
+	exit

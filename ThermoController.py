@@ -7,20 +7,34 @@ import CityWeather
 import Temperature
 import S3Upload
 import Queue
+import ScheduleTask
+import csv
 
+# Pin definition
+REDPIN = 4
+BLUEPIN = 3
 
 # Signal defination
-current_temp_queue = Queue.Queue()
-humidity_queue = Queue.Queue()
-desire_temp_queue = Queue.Queue()
-on_off_queue = Queue.Queue()
-mode_queue = Queue.Queue()
+current_temp_queue = Queue.Queue(0)
+humidity_queue = Queue.Queue(0)
+desire_temp_queue = Queue.Queue(0)
+on_off_queue = Queue.Queue(0)
+mode_queue = Queue.Queue(0)
+user_change_queue = Queue.Queue(0)
+
+# Feature queue
+feature_queue = Queue.Queue(0)
+
+# Priority Queue for schedule tasks
+schedule_priority_queue = Queue.PriorityQueue(0)
 
 # Multithread
 motionThread = MotionDetection.MotionThread("MotionThread")
-appThread = AppCommunicate.AppCommuniacteServerThread("AppCommunicateThread", current_temp_queue, on_off_queue, desire_temp_queue, humidity_queue, mode_queue)
+appThread = AppCommunicate.AppCommuniacteServerThread("AppCommunicateThread", current_temp_queue, 
+			on_off_queue, desire_temp_queue, humidity_queue, mode_queue, schedule_priority_queue)
 tempThread = Temperature.TemperatureThread("TemperatureThread")
 s3Thread = S3Upload.S3Uploader("S3Thread")
+scheduleThread = ScheduleTask.ScheduleThread("ScheduleThread", desire_temp_queue, on_off_queue, schedule_priority_queue)
 
 motionThread.daemon = True
 appThread.daemon = True
@@ -44,8 +58,13 @@ class thermostat():
 		self.on_off = 'ON'
 		self.desire_temp = None
 		self.humidity = None
-		self.mode = "MANUAL"
+		self.mode = "M"
 		self.not_auto_off_flag = True
+
+		self.redLED = mraa.Gpio(REDPIN)
+		self.blueLED = mraa.Gpio(BLUEPIN)
+		self.redLED.dir(mraa.DIR_OUT)
+		self.blueLED.dir(mraa.DIR_OUT)
 
 	def run(self):
 		try:
@@ -120,18 +139,19 @@ class thermostat():
 
 	def cool_on(self):
 		# Do something to cool down
-		pass
+		self.blueLED.write(True)
 
 	def heat_on(self):
 		# Do something to heat up
-		pass
+		self.redLED.write(True)
 
 	def no_operation(self):
 		# Stop cooling and heating
-		pass
+		self.blueLED.write(False)
+		self.redLED.write(False)
 
 if __name__ == '__main__':
-
+	print "System starting..."
 	thermostat_ins = thermostat(current_temp_queue, on_off_queue, desire_temp_queue, humidity_queue, mode_queue)
 	thermostat_ins.run()
 	

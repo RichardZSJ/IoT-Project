@@ -5,10 +5,11 @@ import time
 import datetime
 import os
 import Queue
+import sys
 
 class AppCommuniacteServerThread(threading.Thread):
 	
-	def __init__(self, threadName, current_temp_queue, on_off_queue, desire_temp_queue, humidity_queue, mode_queue):
+	def __init__(self, threadName, current_temp_queue, on_off_queue, desire_temp_queue, humidity_queue, mode_queue, schedule_priority_queue, user_change_queue):
 		threading.Thread.__init__(self)
 		self.threadName = threadName
 
@@ -17,6 +18,7 @@ class AppCommuniacteServerThread(threading.Thread):
 		self.desire_temp_queue = desire_temp_queue
 		self.humidity_queue = humidity_queue
 		self.mode_queue = mode_queue
+		self.schedule_priority_queue = schedule_priority_queue
 
 		self.desire_temp = None
 		self.current_temp = None
@@ -26,16 +28,16 @@ class AppCommuniacteServerThread(threading.Thread):
 
 		self.fileName = 'userCommand.csv'
 		self.scheduleFile = 'scheduleTasks.csv'
-		self.HOST = '209.2.213.152'			# Server host
+		self.HOST = '209.2.212.214'			# Server host
 		self.PORT = 8888					# Server port
 		self.SIZE = 1024					# message size
-		self.cols_user_command = ['TimeStamp', 'Mode', 'AdjustTempTo', 'ScheduleTime']
-		self.cols_schedule = ['ScheduleTime', 'AdjustTempTo']
+		self.cols_user_command = ['TimeStamp', 'Mode', 'AdjustTempTo', 'ON / OFF', 'ScheduleTime']
+		self.cols_schedule = ['ScheduleTime', 'Action']
 
 
 	def run(self):
-		time.sleep(5)
-		# Waiting for threads to start
+		time.sleep(3)
+		# Wait for other threads to start first
 		print "Starting thread:", self.threadName + "..."
 		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		print self.threadName + ': Socket Created'
@@ -47,7 +49,7 @@ class AppCommuniacteServerThread(threading.Thread):
 			sys.exit()
 
 		print self.threadName + ': Socket bind complete'
-		s.listen(5)
+		s.listen(10)
 		print self.threadName + ': Socket listening...'
 
 		while True:
@@ -55,105 +57,131 @@ class AppCommuniacteServerThread(threading.Thread):
 			client, address = s.accept()
 			print self.threadName + ': Connection established with ' + str(address)
 
+			# ==================== Get each status ====================
+			self.current_temp = self.get_queue(self.current_temp_queue)
+			self.desire_temp = self.get_queue(self.desire_temp_queue)
+			self.on_off = self.get_queue(self.on_off_queue)
+			self.humidity = self.get_queue(self.humidity_queue)
+			self.mode = self.get_queue(self.mode_queue)
+
+			# ==================== Communication ====================
+			# The client(socket) is closed everytime a communication ends
+			# A new client will be established for each communication
+
+			if self.on_off is 'ON':
+				# current_temp: 25.5	humidity: 70	desire_temp: 26.0
+				# message length: 10
+				message = str(self.current_temp) + str(self.humidity) + str(self.desire_temp)
+			elif self.on_off is 'OFF':
+				# message length: 3
+				message = "OFF"
+
+			client.send(message + '\r\n')
+			print self.threadName + ': Sent message: ' + message
+
 			while True:
-				# ==================== Get each status ====================
-				self.current_temp = self.get_queue(self.current_temp_queue)
-				self.desire_temp = self.get_queue(self.desire_temp_queue)
-				self.on_off = self.get_queue(self.on_off_queue)
-				self.humidity = self.get_queue(self.humidity_queue)
-				self.mode = self.get_queue(self.mode_queue)
-
-				# ==================== Communication ====================
-				# The client(socket) is closed everytime a communication ends
-				# A new client will be established for each communication
-
-				if self.on_off is 'ON':
-					# current_temp: 25.5	humidity: 70	desire_temp: 26.0
-					# message length: 10
-					message = str(self.current_temp) + str(self.humidity) + str(self.desire_temp)
-				elif self.on_off is 'OFF':
-					# message length: 3
-					message = "OFF"
-				client.send(message)
 
 				data = client.recv(self.SIZE)
+				print self.threadName + ': Received message: ' + data
+
 				if len(data) is not 0:
 					# When receving message
 					# Retrive data, log data to file, update queue.
-					if type(data) is str:
-						print self.threadName + ": App message received: " + data
-						# First character in data indicates mode.
-						if data[0] is 'M':
-							# Manual mode 
-							self.desire_temp = float(data[1:5])
-							print self.threadName + ": Received new desired temperature of", self.desire_temp
-							commandDict = {'TimeStamp': int(time.time()), 'Mode': 'Manual', 'AdjustTempTo': self.desire_temp}
-							with open(self.fileName, 'a') as csvfile:
-								writer = csv.DictWriter(csvfile, fieldnames=self.cols_user_command, lineterminator='\n')
-								writer.writerow(commandDict)
-							print self.threadName + ": Logged user command to " + self.fileName
+					print self.threadName + ": App message received: " + data
 
-							# Put desire_temp into queue
-							self.desire_temp_queue.get()
-							self.desire_temp_queue.put(self.desire_temp)
+					# First character in data indicates mode.
+					if data[0] is 'M':
+						# Manual mode
+						self.desire_temp = float(data[1:5])
+						print self.threadName + ": Received new desired temperature of", self.desire_temp
+						commandDict = {'TimeStamp': int(time.time()), 'Mode': 'Manual', 'AdjustTempTo': self.desire_temp}
+						with open(self.fileName, 'a') as csvfile:
+							writer = csv.DictWriter(csvfile, fieldnames=self.cols_user_command, lineterminator='\n')
+							writer.writerow(commandDict)
+						print self.threadName + ": Logged user command to " + self.fileName
 
-						elif data[0] is 'S':
-							# Schedule task
-							self.desire_temp = float(data[1:5])
-							unixScheduleTime = int(data[5:])
-							datetimeTaskTime = datetime.datetime.fromtimestamp(unixScheduleTime).strftime('%Y-%m-%d %H:%M:%S')
-							print self.threadName + ": Schedule Task @ " + str(datetimeTaskTime) + ", set temperature to", self.desire_temp
+						# Put desire_temp into queue
+						self.desire_temp_queue.get()
+						self.desire_temp_queue.put(self.desire_temp)
+
+					elif data[0] is 'S':
+						if data[1] is 'O' or 'C':
+							# Schedule on / off
+							if data[1] is 'O':
+								schedule_on_off = 'ON'
+							else:
+								schedule_on_off = 'OFF'
+							unixScheduleTime = int(data[3:14])
 							commandDict = {
 											'TimeStamp': int(time.time()),
 											'Mode': 'Schedule',
-											'AdjustTempTo': self.desire_temp,
+											'ON / OFF': schedule_on_off,
 											'ScheduleTime': unixScheduleTime
 											}
-							with open(self.fileName, 'a') as csvfile:
-								writer = csv.DictWriter(csvfile, fieldnames=self.cols_user_command, lineterminator='\n')
-								writer.writerow(commandDict)
-							print self.threadName + ": Logged user command to " + self.fileName
+							datetimeTaskTime = datetime.datetime.fromtimestamp(unixScheduleTime).strftime('%Y-%m-%d %H:%M:%S')
+							print self.threadName + ": Schedule Task @ " + str(datetimeTaskTime) + ", trun on or off:", schedule_on_off
 
 							scheduleDict = {
 											'ScheduleTime': unixScheduleTime,
-											'AdjustTempTo': self.desire_temp
+											'Action': schedule_on_off
 											}
-							with open(self.scheduleFile, 'a') as csvfile:
-								writer = csv.DictWriter(csvfile, fieldnames=self.cols_schedule, lineterminator='\n')
-								writer.writerow(commandDict)
-							reader = csv.reader(open(self.scheduleFile))
-							sortedSchedule = sorted(reader, key=operator.itemgetter(0), reverse=False)
-							try:
-								os.remove(self.scheduleFile)
-							except:
-								pass
-							with open(self.scheduleFile, 'a') as csvfile:
-								writer = csv.DictWriter(csvfile, fieldnames=self.cols_schedule, lineterminator='\n')
-								for row in sortedSchedule:
-									writer.writerow({'ScheduleTime': row[0], 'AdjustTempTo': row[1]})
+							# Put schedule tasks into priority queue
+							schedule_priority_queue.put((unixScheduleTime, schedule_on_off))
 
-						elif data[0] is 'I':
-							# Remote turn on
-							# Clear on_off_queue and put new status
-							self.put_queue(self.on_off_queue, 'ON')
+						else:
+							# Schedule temperature adjust
+							# Get parameters from data
+							schedule_desire_temp = float(data[1:5])
+							unixScheduleTime = int(data[5:16])
 
-						elif data[0] is 'O':
-							# Remote turn off
-							# Clear on_off_queue and put new status
-							self.put_queue(self.on_off_queue, 'OFF')
+							# Put parameters in a dict and write to userCommand.csv
+							commandDict = {
+											'TimeStamp': int(time.time()),
+											'Mode': 'Schedule',
+											'AdjustTempTo': schedule_desire_temp,
+											'ScheduleTime': unixScheduleTime
+											}
+							datetimeTaskTime = datetime.datetime.fromtimestamp(unixScheduleTime).strftime('%Y-%m-%d %H:%M:%S')
+							print self.threadName + ": Schedule Task @ " + str(datetimeTaskTime) + ", set temperature to", schedule_desire_temp
 
-						elif data[0] is 'A':
-							# Auto mode
-							# Clear mode_queue and put new status
-							self.put_queue(self.mode_queue, 'SMART')
+							# Put schedule tasks in a dict, write to scheduleTasks.csv
+							scheduleDict = {
+											'ScheduleTime': unixScheduleTime,
+											'Action': schedule_desire_temp
+											}
+							# Put schedule tasks into priority queue
+							schedule_priority_queue.put((unixScheduleTime, schedule_desire_temp))
 
-					else:
-						print self.threadName + ": Communication data type error"
+						with open(self.scheduleFile, 'a') as csvfile:
+							writer = csv.DictWriter(csvfile, fieldnames=self.cols_schedule, lineterminator='\n')
+							writer.writerow(commandDict)
+
+						with open(self.fileName, 'a') as csvfile:
+							writer = csv.DictWriter(csvfile, fieldnames=self.cols_user_command, lineterminator='\n')
+							writer.writerow(commandDict)
+						print self.threadName + ": Logged user command to " + self.fileName
+
+					elif data[0] is 'O':
+						# Remote turn on
+						# Clear on_off_queue and put new status
+						self.put_queue(self.on_off_queue, 'ON')
+
+					elif data[0] is 'C':
+						# Remote turn off
+						# Clear on_off_queue and put new status
+						self.put_queue(self.on_off_queue, 'OFF')
+
+					elif data[0] is 'A':
+						# Auto mode
+						# Clear mode_queue and put new status
+						self.put_queue(self.mode_queue, 'SMART')
 
 				else:
-					print self.threadName + ": Socket closed"
+					# If data length is 0
 					break
 
+			# Each time an inner loop ends:
+			print self.threadName + ": Socket closed"
 			client.close()
 
 
@@ -163,7 +191,9 @@ class AppCommuniacteServerThread(threading.Thread):
 			queue.put(data)
 			return data
 		else:
-			print 'Error: queue is empty when trying to get'
+			print 'Error: queue is empty when trying to get, waiting to re-get'
+			time.sleep(0.5)
+			self.get_queue(queue)
 
 	def put_queue(self, queue, data):
 		while not queue.empty():
