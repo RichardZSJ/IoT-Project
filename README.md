@@ -2,40 +2,33 @@
   This is the project repository for EECS 6765 Internet of Things
 
 
-***** How to run *****
+## How to run
 Put config.txt that contains the key of AWS in the directory, then run:
-$ python ThermoController.py
+> $ python ThermoController.py
 
 
 
 
 
-<ThermoController class="py">
-	This is the model of a thermostat, which is responsible for 
-</ThermoController>
+## ThermoController.py
+### This is the model of a thermostat, which is responsible for 
 
 
 
 
 
-<AppCommunicate class="py">
 
-
-</AppCommunicate>
-
-
-
-
-<aws class="py">
-
-</aws>
+AppCommunicate.py
 
 
 
 
-<CityWeather class="py">
+aws.py
 
-</CityWeather>
+
+
+
+CityWeather.py
 
 
 
