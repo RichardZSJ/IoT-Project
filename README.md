@@ -10,8 +10,9 @@ Put config.txt that contains the key of AWS in the directory, then run:
 
 
 
-## ThermoController.py
-### This is the model of a thermostat, which is responsible for 
+## Files
+#### ThermoController.py
+This is the model of a thermostat, which is responsible for 
 
 
 
