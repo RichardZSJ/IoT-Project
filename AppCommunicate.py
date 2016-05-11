@@ -28,7 +28,7 @@ class AppCommuniacteServerThread(threading.Thread):
 
 		self.fileName = 'userCommand.csv'
 		self.scheduleFile = 'scheduleTasks.csv'
-		self.HOST = '209.2.212.214'			# Server host
+		self.HOST = '209.2.212.89'			# Server host
 		self.PORT = 8888					# Server port
 		self.SIZE = 1024					# message size
 		self.cols_user_command = ['TimeStamp', 'Mode', 'AdjustTempTo', 'ON / OFF', 'ScheduleTime']
@@ -174,7 +174,20 @@ class AppCommuniacteServerThread(threading.Thread):
 					elif data[0] is 'A':
 						# Auto mode
 						# Clear mode_queue and put new status
-						self.put_queue(self.mode_queue, 'SMART')
+						self.put_queue(self.mode_queue, 'A')
+
+					elif data[0] is 'R':
+						# Update and resend status
+						# ==================== Get each status ====================
+						self.current_temp = self.get_queue(self.current_temp_queue)
+						self.desire_temp = self.get_queue(self.desire_temp_queue)
+						self.on_off = self.get_queue(self.on_off_queue)
+						self.humidity = self.get_queue(self.humidity_queue)
+						self.mode = self.get_queue(self.mode_queue)
+						
+						message = str(self.current_temp) + str(self.humidity) + str(self.desire_temp)
+						client.send(message + '\r\n')
+						print self.threadName + ': Sent message: ' + message
 
 				else:
 					# If data length is 0
@@ -208,18 +221,26 @@ if __name__ == '__main__':
 	humidity_queue = Queue.Queue()
 	mode_queue = Queue.Queue()
 
-	current_temp_queue.put(float(25.5))
+	schedule_priority_queue = Queue.PriorityQueue()
+	user_change_queue = Queue.Queue()
+
+	current_temp_queue.put(float(55.5))
 	on_off_queue.put("ON")
-	desire_temp_queue.put(float(26.5))
-	humidity_queue.put(int(70))
+	desire_temp_queue.put(float(46.5))
+	humidity_queue.put(int(50))
 	mode_queue.put("M")
 
 	appThread = AppCommuniacteServerThread("AppCommunicateThread", 
-		current_temp_queue, on_off_queue, desire_temp_queue, humidity_queue, mode_queue)
+		current_temp_queue, on_off_queue, desire_temp_queue, humidity_queue, mode_queue, schedule_priority_queue, user_change_queue)
 	appThread.daemon = True
 	appThread.start()
 	try:
 		while True:
 			time.sleep(10)
+			current_temp_queue.put(float(15.5))
+			on_off_queue.put("ON")
+			desire_temp_queue.put(float(86.5))
+			humidity_queue.put(int(99))
+			mode_queue.put("M")
 	except KeyboardInterrupt:
-		exit()
+		sys.exit()

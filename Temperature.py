@@ -89,7 +89,7 @@ class TemperatureThread(threading.Thread):
 				T0,T1,T2 = 0,0,0
 			self.tempDict['T0'], self.tempDict['T1'], self.tempDict['T2'] = T0, T1, T2
 
-			cityWeather = CityWeather.get_weather('New York')					
+			cityWeather = CityWeather.get_weather('New York')
 			self.tempDict['outdoor_temp'] = int(cityWeather['temperature']['temp'])
 			self.tempDict['outdoor_humidity'] = float(cityWeather['humidity']) * 0.01
 			status = cityWeather['status']
@@ -127,7 +127,6 @@ def get_queue(queue):
 		get_queue(queue)
 
 def put_queue(queue, data):
-	print "PUT!"
 	while not queue.empty():
 		queue.get()
 	queue.put(data)

@@ -14,7 +14,6 @@ def get_weather(city):
 		response['wind speed'] = str(weather.get_wind()['speed'])
 		response['humidity'] = str(weather.get_humidity())
 		response['temperature'] = weather.get_temperature('celsius')
-		print response
 		return response
 
 	else:

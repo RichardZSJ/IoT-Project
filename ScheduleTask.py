@@ -10,12 +10,15 @@ class ScheduleThread(threading.Thread):
 		self.schedule_priority_queue = schedule_priority_queue
 
 		# Read scheduleTasks.csv and put all incoming schedule tasks into schedule_priority_queue
-		with open('scheduleTasks.csv', 'rb') as f:
-			reader = csv.reader(f)
-			for row in reader:
-				if int(row[0]) > int(time.time()):
-					# If the schedule time hasn't passed
-					self.schedule_priority_queue.put((int(row[0]), row[1]))
+		try:
+			with open('scheduleTasks.csv', 'rb') as f:
+				reader = csv.reader(f)
+				for row in reader:
+					if int(row[0]) > int(time.time()):
+						# If the schedule time hasn't passed
+						self.schedule_priority_queue.put((int(row[0]), row[1]))
+		except:
+			pass
 
 	def run(self):
 		while True:
@@ -49,3 +52,4 @@ class ScheduleThread(threading.Thread):
 		queue.put(data)
 
 if __name__ == '__main__':
+	pass

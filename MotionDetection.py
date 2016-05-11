@@ -30,7 +30,7 @@ class MotionThread(threading.Thread):
 					self.timer = 0
 				else:
 					self.timer += 1
-					if (self.timer > 30):
+					if (self.timer > 5):
 						self.room_sensor_result = False
 
 				if (self.door_seneor.read()):
@@ -42,7 +42,8 @@ class MotionThread(threading.Thread):
 						pass
 
 				print self.threadName + ': People in room:', self.is_people_in_room()
-				time.sleep(1)
+				print self.threadName + ': Door:', self.get_door_sensor_result()
+				time.sleep(3)
 
 		except KeyboardInterrupt:
 			exit(1)

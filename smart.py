@@ -72,6 +72,7 @@ def train():
 class ImplementThread(threading.Thread):
 	def __init__(self, threadName, desire_temp_queue, humidity_queue, mode_queue, feature_queue, user_change_queue):
 		threading.Thread.__init__(self)
+		self.threadName = threadName
 		self.starttime = int(time.time())
 		self.trainFlag = True
 		self.w = 1.0

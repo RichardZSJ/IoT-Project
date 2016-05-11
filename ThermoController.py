@@ -9,10 +9,19 @@ import S3Upload
 import Queue
 import ScheduleTask
 import csv
+import pyupm_i2clcd as lcd
+import smart
+import mraa
 
 # Pin definition
 REDPIN = 4
 BLUEPIN = 3
+
+# LCD
+myLcd = lcd.Jhd1313m1(0, 0x3E, 0x62)
+myLcd.clear()
+myLcd.setColor(255, 255, 0)
+
 
 # Signal defination
 current_temp_queue = Queue.Queue(0)
@@ -28,13 +37,20 @@ feature_queue = Queue.Queue(0)
 # Priority Queue for schedule tasks
 schedule_priority_queue = Queue.PriorityQueue(0)
 
+current_temp_queue.put(25.0)
+humidity_queue.put(50)
+desire_temp_queue.put(25.0)
+on_off_queue.put("ON")
+mode_queue.put("M")
+
 # Multithread
 motionThread = MotionDetection.MotionThread("MotionThread")
 appThread = AppCommunicate.AppCommuniacteServerThread("AppCommunicateThread", current_temp_queue, 
-			on_off_queue, desire_temp_queue, humidity_queue, mode_queue, schedule_priority_queue)
-tempThread = Temperature.TemperatureThread("TemperatureThread")
+			on_off_queue, desire_temp_queue, humidity_queue, mode_queue, schedule_priority_queue, user_change_queue)
+tempThread = Temperature.TemperatureThread("TemperatureThread", current_temp_queue, desire_temp_queue, humidity_queue, feature_queue)
 s3Thread = S3Upload.S3Uploader("S3Thread")
 scheduleThread = ScheduleTask.ScheduleThread("ScheduleThread", desire_temp_queue, on_off_queue, schedule_priority_queue)
+smartThread = smart.ImplementThread("SmartThread", desire_temp_queue, humidity_queue, mode_queue, feature_queue, user_change_queue)
 
 motionThread.daemon = True
 appThread.daemon = True
@@ -67,6 +83,7 @@ class thermostat():
 		self.blueLED.dir(mraa.DIR_OUT)
 
 	def run(self):
+		time.sleep(3)
 		try:
 			while True:
 				if self.on_off is 'ON' and (motionThread.is_people_in_room() or self.not_auto_off_flag):
@@ -79,22 +96,29 @@ class thermostat():
 
 					# ==================== Execution ====================
 					if self.mode is 'M' and self.on_off is 'ON':
+						print ''
 						print '========== Manual Mode =========='
 						print 'Current temperature:', self.current_temp
 						print 'Desire temperature:', self.desire_temp
 
 						if (self.current_temp - self.desire_temp) > 0.5:
 							print 'Current temperature too high'
+							print ''
 							print '***** COOLING *****'
+							print ''
 							self.cool_on()
 
 						elif (self.desire_temp - self.current_temp) > 0.5:
 							print 'Current temperature too low'
+							print ''
 							print '***** HEATING *****'
+							print ''
 							self.heat_on()
 
 						else:
+							print ''
 							print 'Current temperature matches desire temperature'
+							print ''
 							# Stop
 
 					elif self.mode == 'A' and self.on_off == 'ON':
@@ -104,20 +128,34 @@ class thermostat():
 
 						if (self.current_temp - self.desire_temp) > 0.5:
 							print 'Current temperature too high'
+							print ''
 							print '***** COOLING *****'
+							print ''
 
 						elif (self.desire_temp - self.current_temp) > 0.5:
 							print 'Current temperature too low'
+							print ''
 							print '***** HEATING *****'
+							print ''
 
 					elif self.on_off == 'OFF':
 						print 'Thermostat OFF'
 
-					time.sleep(10)
+					if self.mode:
+						myLcd.setCursor(0,0)
+						myLcd.write("MODE: " + self.mode)
+					if self.current_temp and self.desire_temp:
+						myLcd.setCursor(1,0)
+						myLcd.write("CT:" + str(self.current_temp) + "  DT:" + str(self.desire_temp))
+					time.sleep(3.1)
 
 				else:
 					print "Thermostat: No one in room"
 					self.put_queue(self.on_off_queue, "OFF")
+					myLcd.clear()
+					myLcd.setColor(255, 255, 0)
+					myLcd.setCursor(0,0)
+					myLcd.write("OFF")
 					time.sleep(1)
 
 		except KeyboardInterrupt:
