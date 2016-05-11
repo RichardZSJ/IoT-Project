@@ -11,7 +11,7 @@ Put config.txt that contains the key of AWS in the directory, then run:
 
 
 ## Files
-ThermoController.py:
+- ThermoController.py:
 This is the model of a thermostat, which is responsible for 
 
 
@@ -19,33 +19,33 @@ This is the model of a thermostat, which is responsible for
 
 
 
-AppCommunicate.py:
+- AppCommunicate.py:
 
 
 
 
-aws.py:
+- aws.py:
 
 
 
 
 
-MotionDetection.py:
+- MotionDetection.py:
 
 
 
 
-smart.py:
-	
+- smart.py:
 
 
 
-Temperature.py:
+
+- Temperature.py:
 
 
-CityWeather.py:
+- CityWeather.py:
 
-S3Upload.py:
+- S3Upload.py:
 File to upload 
 
 
