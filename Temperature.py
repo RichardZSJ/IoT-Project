@@ -65,11 +65,15 @@ class TemperatureThread(threading.Thread):
 	def run(self):
 		while 1:
 			current_temp = get_room_temp()
-			humidity = get_room_humidity()
 			#WRITE current_temp into que
 			put_queue(self.current_temp_queue, current_temp)
+			
+			cityWeather = CityWeather.get_weather('New York')
+			self.tempDict['outdoor_temp'] = int(cityWeather['temperature']['temp'])
+			self.tempDict['outdoor_humidity'] = float(cityWeather['humidity']) * 0.01
+			status = cityWeather['status']
+			humidity = self.tempDict['outdoor_humidity']
 			put_queue(self.humidity_queue, humidity)
-
 			ta = temp2(ICL, RH).solve()
 			#Read desired temp from que(desired_temp)
 			desired_temp = get_queue(self.desire_temp_queue)
@@ -89,10 +93,7 @@ class TemperatureThread(threading.Thread):
 				T0,T1,T2 = 0,0,0
 			self.tempDict['T0'], self.tempDict['T1'], self.tempDict['T2'] = T0, T1, T2
 
-			cityWeather = CityWeather.get_weather('New York')
-			self.tempDict['outdoor_temp'] = int(cityWeather['temperature']['temp'])
-			self.tempDict['outdoor_humidity'] = float(cityWeather['humidity']) * 0.01
-			status = cityWeather['status']
+
 			if status == 'Clear':
 				w0,w1,w2 = 1,0,0
 			elif status == 'Clouds':

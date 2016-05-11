@@ -91,7 +91,7 @@ class ImplementThread(threading.Thread):
 				print 'waiting!'
 				#time.sleep(100)
 				time.sleep(1)
-			elif MODE is not "S":
+			elif MODE is not "A":
 				time.sleep(1)
 			else:
 				self.w = exp(2.0*(int(time.time()) - self.starttime)/604800.0)

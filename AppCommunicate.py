@@ -28,7 +28,7 @@ class AppCommuniacteServerThread(threading.Thread):
 
 		self.fileName = 'userCommand.csv'
 		self.scheduleFile = 'scheduleTasks.csv'
-		self.HOST = '209.2.212.89'			# Server host
+		self.HOST = '209.2.212.211'			# Server host
 		self.PORT = 8888					# Server port
 		self.SIZE = 1024					# message size
 		self.cols_user_command = ['TimeStamp', 'Mode', 'AdjustTempTo', 'ON / OFF', 'ScheduleTime']
@@ -71,7 +71,7 @@ class AppCommuniacteServerThread(threading.Thread):
 			if self.on_off is 'ON':
 				# current_temp: 25.5	humidity: 70	desire_temp: 26.0
 				# message length: 10
-				message = str(self.current_temp) + str(self.humidity) + str(self.desire_temp)
+				message = str(self.current_temp) + str(int(self.humidity * 100)) + str(self.desire_temp)
 			elif self.on_off is 'OFF':
 				# message length: 3
 				message = "OFF"
@@ -185,7 +185,7 @@ class AppCommuniacteServerThread(threading.Thread):
 						self.humidity = self.get_queue(self.humidity_queue)
 						self.mode = self.get_queue(self.mode_queue)
 						
-						message = str(self.current_temp) + str(self.humidity) + str(self.desire_temp)
+						message = str(self.current_temp) + str(int(self.humidity * 100)) + str(self.desire_temp)
 						client.send(message + '\r\n')
 						print self.threadName + ': Sent message: ' + message
 

@@ -23,7 +23,7 @@ myLcd.clear()
 myLcd.setColor(255, 255, 0)
 
 
-# Signal defination
+# Queue defination
 current_temp_queue = Queue.Queue(0)
 humidity_queue = Queue.Queue(0)
 desire_temp_queue = Queue.Queue(0)
@@ -75,7 +75,7 @@ class thermostat():
 		self.desire_temp = None
 		self.humidity = None
 		self.mode = "M"
-		self.not_auto_off_flag = True
+		self.auto_off_enable = True
 
 		self.redLED = mraa.Gpio(REDPIN)
 		self.blueLED = mraa.Gpio(BLUEPIN)
@@ -86,13 +86,14 @@ class thermostat():
 		time.sleep(3)
 		try:
 			while True:
-				if self.on_off is 'ON' and (motionThread.is_people_in_room() or self.not_auto_off_flag):
-					# ==================== Get each status ====================
-					self.current_temp = self.get_queue(self.current_temp_queue)
-					self.desire_temp = self.get_queue(self.desire_temp_queue)
-					self.on_off = self.get_queue(self.on_off_queue)
-					self.humidity = self.get_queue(self.humidity_queue)
-					self.mode = self.get_queue(self.mode_queue)
+				# ==================== Get each status ====================
+				self.current_temp = self.get_queue(self.current_temp_queue)
+				self.desire_temp = self.get_queue(self.desire_temp_queue)
+				self.on_off = self.get_queue(self.on_off_queue)
+				self.humidity = self.get_queue(self.humidity_queue)
+				self.mode = self.get_queue(self.mode_queue)
+
+				if self.on_off is 'ON' and (motionThread.is_people_in_room() or not self.auto_off_enable):
 
 					# ==================== Execution ====================
 					if self.mode is 'M' and self.on_off is 'ON':
@@ -101,25 +102,28 @@ class thermostat():
 						print 'Current temperature:', self.current_temp
 						print 'Desire temperature:', self.desire_temp
 
-						if (self.current_temp - self.desire_temp) > 0.5:
-							print 'Current temperature too high'
-							print ''
-							print '***** COOLING *****'
-							print ''
-							self.cool_on()
-
-						elif (self.desire_temp - self.current_temp) > 0.5:
-							print 'Current temperature too low'
-							print ''
-							print '***** HEATING *****'
-							print ''
-							self.heat_on()
-
-						else:
-							print ''
-							print 'Current temperature matches desire temperature'
-							print ''
-							# Stop
+						try:
+							if (self.current_temp - self.desire_temp) > 0.5:
+								print 'Current temperature too high'
+								print ''
+								print '***** COOLING *****'
+								print ''
+								self.set_cool(True)
+							else:
+								self.set_cool(False)
+						except:
+							pass
+						try:
+							if (self.desire_temp - self.current_temp) > 0.5:
+								print 'Current temperature too low'
+								print ''
+								print '***** HEATING *****'
+								print ''
+								self.set_heat(True)
+							else:
+								self.set_heat(False)
+						except:
+							pass
 
 					elif self.mode == 'A' and self.on_off == 'ON':
 						print '========== Smart Mode =========='
@@ -175,18 +179,14 @@ class thermostat():
 			queue.get()
 		queue.put(data)
 
-	def cool_on(self):
+	def set_cool(self, value):
 		# Do something to cool down
-		self.blueLED.write(True)
+		self.blueLED.write(value)
 
-	def heat_on(self):
+	def set_heat(self, value):
 		# Do something to heat up
-		self.redLED.write(True)
+		self.redLED.write(value)
 
-	def no_operation(self):
-		# Stop cooling and heating
-		self.blueLED.write(False)
-		self.redLED.write(False)
 
 if __name__ == '__main__':
 	print "System starting..."
