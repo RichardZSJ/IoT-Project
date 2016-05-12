@@ -28,7 +28,7 @@ class AppCommuniacteServerThread(threading.Thread):
 
 		self.fileName = 'userCommand.csv'
 		self.scheduleFile = 'scheduleTasks.csv'
-		self.HOST = '209.2.212.211'			# Server host
+		self.HOST = '209.2.212.228'			# Server host
 		self.PORT = 8888					# Server port
 		self.SIZE = 1024					# message size
 		self.cols_user_command = ['TimeStamp', 'Mode', 'AdjustTempTo', 'ON / OFF', 'ScheduleTime']
